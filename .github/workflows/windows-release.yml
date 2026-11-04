@@ -1,0 +1,63 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests (includes Windows-native DPAPI/registry/window tests)
+        run: python -m pytest -v
+
+      - name: Build TatkalMate.exe
+        run: pyinstaller --noconfirm TatkalMate.spec
+
+      - name: Smoke-test the built exe
+        shell: pwsh
+        run: |
+          $env:TATKALMATE_HOME = "$env:RUNNER_TEMP\tm-smoke"
+          $p = Start-Process -FilePath "dist\TatkalMate\TatkalMate.exe" -ArgumentList "--smoke-test","6" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { Get-Content "$env:TATKALMATE_HOME\logs\tatkalmate.log" -ErrorAction SilentlyContinue; exit 1 }
+          $session = Get-Content "$env:TATKALMATE_HOME\session.json" | ConvertFrom-Json
+          if (-not $session.clean_shutdown) { Write-Error "exe did not shut down cleanly"; exit 1 }
+          Get-Content "$env:TATKALMATE_HOME\logs\tatkalmate.log" | Select-Object -Last 5
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\TatkalMate -DestinationPath TatkalMate-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TatkalMate-windows-x64
+          path: TatkalMate-windows-x64.zip
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME TatkalMate-windows-x64.zip `
+            --title "TatkalMate AI $env:GITHUB_REF_NAME" `
+            --notes "Windows 11 x64 build. Unzip and run TatkalMate.exe. The exe is not code-signed, so SmartScreen will warn on first launch: click 'More info' then 'Run anyway'. Availability data is simulated until an authorized provider is configured (see README)."

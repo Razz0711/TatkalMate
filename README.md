@@ -34,7 +34,15 @@ A Windows desktop assistant (PySide6) that **prepares** you for an IRCTC Tatkal 
 * The network health probe connects to a neutral host (default `1.1.1.1:443`), never IRCTC.
 * Passenger names are registered with the log redactor, and e-mails, phone numbers and OTP/password fragments are masked in every log line and crash report.
 
-## Run it on Windows 11
+## Download (no Python needed)
+
+Grab `TatkalMate-windows-x64.zip` from the [latest release](https://github.com/Razz0711/TatkalMate/releases/latest), unzip it anywhere (e.g. `C:\Apps\TatkalMate`) and run `TatkalMate.exe`.
+
+The exe is **not code-signed**, so Windows SmartScreen shows "Windows protected your PC" on first launch. Click **More info → Run anyway**. Every build is produced by the public GitHub Actions workflow in `.github/workflows/windows-release.yml`, which also runs the test suite on Windows.
+
+To publish a new version: bump `core/version.py`, then `git tag v0.1.1 && git push --tags`.
+
+## Run from source on Windows 11
 
 Requires Python 3.11 or newer (python.org installer, tick "Add to PATH").
 
@@ -49,7 +57,7 @@ python main.py
 
 Or double-click `scripts\run_windows.bat`, which sets up the environment the first time.
 
-To build a standalone `TatkalMate.exe`: `pip install -r requirements-dev.txt` then `.\scripts\build_windows.ps1`.
+To build `TatkalMate.exe` locally: `pip install -r requirements-dev.txt` then `.\scripts\build_windows.ps1` (output in `dist\TatkalMate`).
 
 Data lives in `%LOCALAPPDATA%\TatkalMate` (config, SQLite DB, `logs\`, `crashes\`). `python main.py --data-dir D:\somewhere` or `TATKALMATE_HOME` overrides it.
 
