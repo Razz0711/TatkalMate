@@ -138,7 +138,8 @@ class ReadinessService:
         out.append(
             ReadinessItem("reminder_enabled", "Booking opening reminder enabled",
                           CheckState.DONE if enabled else CheckState.PENDING, CheckSource.DERIVED,
-                          ("Reminders at " + ", ".join(f"{m} min" for m in cfg.reminder_minutes) + " before opening"
+                          ("Alerts at " + ", ".join(f"T-{m}" for m in cfg.reminder_minutes)
+                           + (f", refresh at T-{cfg.refresh_reminder_minutes}" if cfg.refresh_reminder_minutes else "")
                            + ("" if cfg.desktop_enabled else " (in-app only: desktop alerts are off)"))
                           if enabled else "Turn on opening reminders in Settings.")
         )

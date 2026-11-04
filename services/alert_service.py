@@ -29,6 +29,8 @@ class AlertService:
         bus.subscribe(EventType.TATKAL_REMINDER, self._on_reminder)
         bus.subscribe(EventType.TATKAL_OPENED, self._on_opened)
         bus.subscribe(EventType.TASK_FAILED, self._on_task_failed)
+        bus.subscribe(EventType.TATKAL_REFRESH_DUE, self._on_refresh)
+        bus.subscribe(EventType.TIME_SYNCED, self._on_time_synced)
 
     def _on_availability_changed(self, e: Event) -> None:
         result: AvailabilityResult = e.payload["result"]
@@ -101,7 +103,21 @@ class AlertService:
         self._n.notify(NotificationKind.TATKAL_OPENING, f"{s.window.label} opens in {m} min",
                        f"Booking opens at {s.opens_at:%H:%M} IST on {s.booking_date:%d %b}. "
                        "Check that you're logged in to IRCTC and the wallet is ready.",
-                       Severity.WARNING, f"remind:{s.opens_at.isoformat()}:{m}", sound=m <= 2)
+                       Severity.WARNING, f"remind:{s.opens_at.isoformat()}:{m}", sound=m <= 5)
+
+    def _on_refresh(self, e: Event) -> None:
+        s = e.payload["schedule"]
+        self._n.notify(NotificationKind.TATKAL_OPENING, "Refresh IRCTC now",
+                       f"{e.payload['minutes']} min to opening. Refresh the IRCTC page in Brave (F5) so your session "
+                       "is fresh, then stay on the search page.", Severity.WARNING,
+                       f"refresh:{s.opens_at.isoformat()}", sound=True)
+
+    def _on_time_synced(self, e: Event) -> None:
+        st = e.payload["status"]
+        if st.synced and abs(st.offset) >= 1.0:
+            self._n.notify(NotificationKind.CLOCK, f"PC clock is {st.offset:+.1f} s off",
+                           f"The countdown is corrected using {st.server}. Turn on 'Set time automatically' in "
+                           "Windows Settings so IRCTC and your PC agree.", Severity.WARNING, "ntp-offset")
 
     def _on_opened(self, e: Event) -> None:
         s = e.payload["schedule"]

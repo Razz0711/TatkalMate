@@ -68,8 +68,15 @@ def main(out: Path) -> None:
 
     def shoot(i: int = 0) -> None:
         if i >= len(NAV_ITEMS):
-            ctx.shutdown()
-            app.quit()
+            w.toggle_quick_panel()
+            w.quick_panel.adjustSize()
+
+            def grab_panel() -> None:
+                w.quick_panel.grab().save(str(out / "10-quick-panel.png"))
+                ctx.shutdown()
+                app.quit()
+
+            QTimer.singleShot(400, grab_panel)
             return
         w.nav.setCurrentRow(i)
         QTimer.singleShot(250, lambda: (w.grab().save(str(out / f"{i + 1:02d}-{NAV_ITEMS[i].key}.png")), shoot(i + 1)))

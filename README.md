@@ -11,12 +11,17 @@ A Windows desktop assistant (PySide6) that **prepares** you for an IRCTC Tatkal 
 | Dashboard | Journey, millisecond countdown, system status, latest availability with its freshness, readiness checklist |
 | Journey | Train, stations, date, class, quota, and a "boarding day" offset for mid-route boarding |
 | Tatkal scheduler | AC 10:00 IST, non-AC 11:00 IST, one day before the train leaves its **origin** station. Survives restarts and system clock changes |
+| IST sync | SNTP check against `time.google.com` / `time.windows.com` / `pool.ntp.org` every 15 min; the measured PC clock offset is applied to the countdown and shown on the dashboard |
+| Pre-opening routine | Brave auto-opens on IRCTC at T-15 (configurable), alerts at T-10/5/1, a "refresh IRCTC now" alert at T-2, Brave brought to the front at T-0 |
+| Quick panel | Always-on-top mini window (`Ctrl+Q`, pops up automatically at T-5): live countdown, one-click copy of train, stations, date (dd/mm/yyyy), class, quota and passenger names/ages |
 | Passengers | Up to 4 per Tatkal booking, validated against IRCTC field limits, names encrypted at rest (Windows DPAPI) |
 | Preparation | Readiness checklist that labels every item as *from app data*, *auto-detected* or *confirmed by you*. eWallet balance reminder and payment walkthrough |
 | Availability | Provider abstraction, rate-limited polling, backoff, timeouts, de-duplication, stale/cached detection, full history |
 | Notifications | Windows toasts, in-app centre, sounds, duplicate suppression (persists across restarts) |
 | Browser | Detects Brave, launches it with your normal profile on the IRCTC site, watches for unexpected closure, brings it to the front |
 | Reliability | Single instance, crash reports, unclean-exit recovery, supervised background tasks, log rotation, health checks |
+
+![Quick panel](docs/screenshots/10-quick-panel.png)
 
 ## What is NOT connected yet (read this)
 
@@ -61,14 +66,14 @@ To build `TatkalMate.exe` locally: `pip install -r requirements-dev.txt` then `.
 
 Data lives in `%LOCALAPPDATA%\TatkalMate` (config, SQLite DB, `logs\`, `crashes\`). `python main.py --data-dir D:\somewhere` or `TATKALMATE_HOME` overrides it.
 
-Keyboard: `Ctrl+1`…`Ctrl+9` switch pages.
+Keyboard: `Ctrl+1`…`Ctrl+9` switch pages, `Ctrl+Q` toggles the quick panel.
 
 ## Suggested workflow on booking day
 
 1. Day before: save the journey and passengers; set an estimated fare.
-2. ~30 min before opening: **Browser → Launch Brave and open IRCTC**, log in yourself, then **Preparation → Confirm** the login.
-3. Check the eWallet balance on IRCTC and tick it.
-4. Reminders fire at 30/10/2 minutes (configurable) and at opening. Use **Bring Brave to front** and book.
+2. Leave TatkalMate running. At T-15 it opens Brave on IRCTC; log in yourself, then **Preparation → Confirm** the login and tick the eWallet check.
+3. T-10/5/1 alerts fire; the quick panel pops up at T-5 with copy buttons. At T-2 you're told to refresh IRCTC.
+4. At opening Brave comes to the front. Book and pay yourself.
 
 ## Architecture
 
@@ -88,7 +93,7 @@ providers/                   base interface, mock, authorized adapter
 services/                    brave, availability, notifications, alerts, passengers,
                              journey, wallet, readiness, reminders, health, container
 app/                         PySide6 UI: main window, bridge to the GUI thread, views, theme
-tests/                       85 tests (scheduler, monitor, providers, services, UI smoke)
+tests/                       99 tests (scheduler, monitor, providers, services, UI smoke)
 ```
 
 Background work (monitoring, reminders, browser watch, health checks) runs on an asyncio loop in a worker thread. Services publish events on the bus; `app/bridge.py` re-emits them on the Qt thread, so services never touch widgets. `services/alert_service.py` is the single place that turns events into user-facing alerts, which keeps the "never claim unconfirmed availability" rule in one auditable spot.
@@ -108,7 +113,7 @@ Background work (monitoring, reminders, browser watch, health checks) runs on an
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                       # 85 tests; UI tests run offscreen
+pytest                       # 99 tests; UI tests run offscreen
 QT_QPA_PLATFORM=offscreen python main.py --smoke-test 5
 QT_QPA_PLATFORM=offscreen python scripts/screenshots.py screenshots
 ```

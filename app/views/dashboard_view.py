@@ -55,9 +55,9 @@ class DashboardView(Page):
 
         # System status
         sc = Card("System status")
-        self.status_grid = KeyValueGrid(["Brave browser", "IRCTC session", "Provider", "Network", "Last check"])
+        self.status_grid = KeyValueGrid(["Brave browser", "IRCTC session", "Provider", "Network", "IST sync", "Last check"])
         self.pills: dict[str, Pill] = {}
-        for key in ["Brave browser", "IRCTC session", "Provider", "Network"]:
+        for key in ["Brave browser", "IRCTC session", "Provider", "Network", "IST sync"]:
             p = Pill()
             self.pills[key] = p
             self.status_grid.set_widget(key, p)
@@ -105,7 +105,7 @@ class DashboardView(Page):
         if e.type in (EventType.JOURNEY_CHANGED, EventType.READINESS_CHANGED, EventType.AVAILABILITY_RESULT,
                       EventType.BROWSER_STATE_CHANGED, EventType.HEALTH_UPDATED, EventType.MONITOR_STATE_CHANGED,
                       EventType.AVAILABILITY_STALE, EventType.WALLET_CHANGED, EventType.CONFIG_CHANGED,
-                      EventType.NETWORK_CHANGED):
+                      EventType.NETWORK_CHANGED, EventType.TIME_SYNCED):
             self.refresh()
 
     def _tick(self) -> None:
@@ -165,6 +165,15 @@ class DashboardView(Page):
         online = ctx.health.network_online
         self.pills["Network"].set({True: ("Online", "ok"), False: ("Offline", "bad"), None: ("Checking", "")}[online][0],
                                   {True: "ok", False: "bad", None: ""}[online])
+        ts = ctx.time_sync.status if ctx.time_sync else None
+        if ts is None:
+            self.pills["IST sync"].set("System clock", "")
+        elif ts.synced:
+            self.pills["IST sync"].set(f"NTP {ts.offset * 1000:+.0f} ms ({ts.server})", "ok" if abs(ts.offset) < 1 else "warn")
+        elif ts.last_attempt:
+            self.pills["IST sync"].set("NTP unreachable: using PC clock", "warn")
+        else:
+            self.pills["IST sync"].set("Syncing…", "")
         snap = ctx.availability.snapshot()
         self.status_grid.set("Last check", f"{ist(snap.last_success_at, '%H:%M:%S')} ({ago(snap.last_success_at, now)})"
                              if snap.last_success_at else "No successful check yet")

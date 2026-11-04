@@ -27,6 +27,7 @@ from app.views.monitoring_view import MonitoringView
 from app.views.notifications_view import NotificationsView
 from app.views.passengers_view import PassengersView
 from app.views.preparation_view import PreparationView
+from app.views.quick_panel import QuickPanel
 from app.views.settings_view import SettingsView
 from core.event_bus import Event, EventType
 from core.version import APP_NAME, __version__
@@ -68,6 +69,13 @@ class MainWindow(QMainWindow):
         for item in NAV_ITEMS:
             QListWidgetItem(f"{item.glyph}   {item.label}", self.nav)
         sl.addWidget(self.nav, 1)
+        from app.components.widgets import button
+        self.quick_btn = button("Quick panel  (Ctrl+Q)", tooltip="Always-on-top countdown and copy helpers")
+        self.quick_btn.clicked.connect(self.toggle_quick_panel)
+        qb = QHBoxLayout()
+        qb.setContentsMargins(12, 0, 12, 8)
+        qb.addWidget(self.quick_btn)
+        sl.addLayout(qb)
         ver = QLabel(f"v{__version__} · Asia/Kolkata")
         ver.setObjectName("AppSubtitle")
         sl.addWidget(ver)
@@ -101,6 +109,8 @@ class MainWindow(QMainWindow):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.activated.connect(lambda i=i: self.nav.setCurrentRow(i))
 
+        self.quick_panel: QuickPanel | None = None
+        QShortcut(QKeySequence("Ctrl+Q"), self).activated.connect(self.toggle_quick_panel)
         self.notifier = DesktopNotifier(bridge, self.show_and_raise, self.quit_app)
         ctx.notifications.add_sink(self.notifier)
         bridge.event.connect(self._on_event)
@@ -112,7 +122,22 @@ class MainWindow(QMainWindow):
         if hasattr(view, "refresh"):
             view.refresh()
 
+    def toggle_quick_panel(self) -> None:
+        if self.quick_panel is None:
+            self.quick_panel = QuickPanel(self.ctx)
+            self.quick_panel.setStyleSheet(self.styleSheet())
+            geo = self.screen().availableGeometry()
+            self.quick_panel.move(geo.right() - 380, geo.top() + 40)
+        if self.quick_panel.isVisible():
+            self.quick_panel.hide()
+        else:
+            self.quick_panel.refresh()
+            self.quick_panel.show()
+            self.quick_panel.raise_()
+
     def _on_event(self, e: Event) -> None:
+        if self.quick_panel is not None:
+            self.quick_panel.handle_event(e)
         for view in self.views.values():
             handler = getattr(view, "handle_event", None)
             if handler:
@@ -120,6 +145,9 @@ class MainWindow(QMainWindow):
                     handler(e)
                 except Exception:
                     log.exception("view failed to handle event", extra={"event": e.type.value})
+        if e.type is EventType.TATKAL_REMINDER and e.payload.get("minutes", 99) <= 5 \
+                and (self.quick_panel is None or not self.quick_panel.isVisible()):
+            self.toggle_quick_panel()  # pop the copy helpers up for the final minutes
         if e.type in (EventType.NOTIFICATION_CREATED, EventType.MONITOR_STATE_CHANGED,
                       EventType.NETWORK_CHANGED, EventType.BROWSER_STATE_CHANGED):
             self._update_status()
@@ -157,4 +185,6 @@ class MainWindow(QMainWindow):
                                            "background. Use the tray icon to quit.")
             return
         self.notifier.hide()
+        if self.quick_panel is not None:
+            self.quick_panel.close()
         event.accept()

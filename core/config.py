@@ -45,7 +45,8 @@ class NotificationConfig:
     sound_enabled: bool = True
     dedupe_window_seconds: float = 300.0
     opening_reminders_enabled: bool = True
-    reminder_minutes: list[int] = field(default_factory=lambda: [30, 10, 2])
+    reminder_minutes: list[int] = field(default_factory=lambda: [10, 5, 1])
+    refresh_reminder_minutes: int = 2  # "refresh the IRCTC page now" alert; 0 = off
 
 
 @dataclass
@@ -53,6 +54,8 @@ class BrowserConfig:
     brave_path_override: str = ""
     irctc_url: str = IRCTC_HOME_URL
     watch_interval_seconds: float = 3.0
+    auto_launch_minutes_before: int = 15  # open Brave on IRCTC this long before opening; 0 = off
+    focus_at_opening: bool = True  # bring Brave to the front when Tatkal opens
 
 
 @dataclass
@@ -60,6 +63,13 @@ class NetworkConfig:
     probe_host: str = "1.1.1.1"
     probe_port: int = 443
     probe_interval_seconds: float = 30.0
+
+
+@dataclass
+class TimeSyncConfig:
+    enabled: bool = True
+    servers: list[str] = field(default_factory=lambda: ["time.google.com", "time.windows.com", "pool.ntp.org"])
+    interval_seconds: float = 900.0
 
 
 @dataclass
@@ -74,6 +84,7 @@ class AppConfig:
     notifications: NotificationConfig = field(default_factory=NotificationConfig)
     browser: BrowserConfig = field(default_factory=BrowserConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
+    time_sync: TimeSyncConfig = field(default_factory=TimeSyncConfig)
     ui: UiConfig = field(default_factory=UiConfig)
 
     def validated(self) -> "AppConfig":
@@ -89,13 +100,18 @@ class AppConfig:
         n = self.notifications
         n.dedupe_window_seconds = max(10.0, float(n.dedupe_window_seconds))
         n.reminder_minutes = sorted({int(x) for x in n.reminder_minutes if 0 < int(x) <= 24 * 60}, reverse=True)
+        n.refresh_reminder_minutes = min(60, max(0, int(n.refresh_reminder_minutes)))
         b = self.browser
+        b.auto_launch_minutes_before = min(240, max(0, int(b.auto_launch_minutes_before)))
         b.watch_interval_seconds = min(30.0, max(1.0, float(b.watch_interval_seconds)))
         if not b.irctc_url.startswith("https://"):
             b.irctc_url = IRCTC_HOME_URL
         net = self.network
         net.probe_interval_seconds = max(10.0, float(net.probe_interval_seconds))
         net.probe_port = int(net.probe_port)
+        t = self.time_sync
+        t.interval_seconds = max(300.0, float(t.interval_seconds))
+        t.servers = [str(x).strip() for x in t.servers if str(x).strip()] or list(TimeSyncConfig().servers)
         return self
 
 

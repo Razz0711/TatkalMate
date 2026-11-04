@@ -178,6 +178,10 @@ class TatkalScheduler:
             return Phase.BOOKING_DAY_PRE_OPEN
         return Phase.BEFORE_BOOKING_DAY
 
+    def reset_clock_baseline(self) -> None:
+        self._last_wall = self._clock.now_utc()
+        self._last_mono = self._clock.monotonic()
+
     def check_clock(self) -> ClockJump | None:
         wall = self._clock.now_utc()
         mono = self._clock.monotonic()

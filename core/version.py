@@ -2,7 +2,7 @@
 
 APP_NAME = "TatkalMate AI"
 APP_ID = "TatkalMate"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 BUILD_CHANNEL = "alpha"
 
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from core.async_runtime import AsyncRuntime
 from core.clock import Clock, SystemClock
+from core.time_sync import OffsetClock
 from core.config import ConfigManager
 from core.event_bus import Event, EventBus, EventType
 from core.paths import AppPaths
@@ -24,13 +25,14 @@ from providers import create_provider
 from providers.base_provider import AvailabilityProvider
 from services.alert_service import AlertService
 from services.availability_service import AvailabilityService
-from services.brave_service import BraveService
+from services.brave_service import BraveService, BrowserState
 from services.health_service import HealthService
 from services.journey_service import JourneyService
 from services.notification_service import NotificationService
 from services.passenger_service import PassengerService
 from services.readiness_service import ReadinessService
 from services.reminder_service import ReminderService
+from services.time_sync_service import TimeSyncService
 from services.wallet_readiness_service import WalletReadinessService
 
 log = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ class AppContext:
     readiness: ReadinessService
     health: HealthService
     reminders: ReminderService
+    time_sync: TimeSyncService | None = None
     background_started: bool = False
 
     def start_background(self) -> None:
@@ -64,6 +67,8 @@ class AppContext:
         self.runtime.start()
         cfg = self.config
         self.runtime.spawn("reminders", self.reminders.run_loop)
+        if self.time_sync is not None:
+            self.runtime.spawn("time-sync", self.time_sync.run_loop)
         self.runtime.spawn("browser-watch", lambda: self.brave.watch(lambda: cfg.config.browser.watch_interval_seconds))
         self.runtime.spawn("health", self.health.run_loop)
         self.background_started = True
@@ -85,7 +90,7 @@ def build_context(
     brave: BraveService | None = None,
     codec: SecureCodec | None = None,
 ) -> AppContext:
-    clock = clock or SystemClock()
+    clock = clock or OffsetClock(SystemClock())
     config = ConfigManager(paths.config_file)
     bus = EventBus()
     runtime = AsyncRuntime(bus)
@@ -110,7 +115,35 @@ def build_context(
                                  lambda: config.config.notifications, bus, clock)
     health = HealthService(db, paths, codec, lambda: availability.provider, lambda: config.config.network,
                            bus, clock, runtime, brave)
-    reminders = ReminderService(scheduler, bus, clock, lambda: config.config.notifications)
+    reminders = ReminderService(scheduler, bus, clock, lambda: config.config.notifications,
+                                lambda: config.config.browser)
+    time_sync = (TimeSyncService(clock, scheduler, bus, lambda: config.config.time_sync)
+                 if isinstance(clock, OffsetClock) else None)
+
+    def on_auto_launch(e: Event) -> None:
+        from core.exceptions import BrowserError
+        from models.notification import NotificationKind, Severity
+
+        if brave.state is BrowserState.RUNNING:
+            notifications.notify(NotificationKind.BROWSER, "Brave is open",
+                                 f"Tatkal opens in {e.payload['minutes']} min. Make sure IRCTC is open and you're "
+                                 "logged in.", Severity.INFO, "auto-launch")
+            return
+        try:
+            brave.launch(config.config.browser.irctc_url)
+            notifications.notify(NotificationKind.BROWSER, "Brave opened on IRCTC",
+                                 f"Tatkal opens in {e.payload['minutes']} min. Log in now.", Severity.WARNING,
+                                 "auto-launch", sound=True)
+        except BrowserError as exc:
+            notifications.notify(NotificationKind.BROWSER, "Could not open Brave automatically", str(exc),
+                                 Severity.CRITICAL, "auto-launch", sound=True)
+
+    def on_opened(_e: Event) -> None:
+        if config.config.browser.focus_at_opening:
+            brave.bring_to_foreground()
+
+    bus.subscribe(EventType.BROWSER_AUTO_LAUNCH_DUE, on_auto_launch)
+    bus.subscribe(EventType.TATKAL_OPENED, on_opened)
 
     def on_config(new_cfg) -> None:
         availability.config = new_cfg.monitoring
@@ -132,4 +165,4 @@ def build_context(
         bus.subscribe(et, lambda _e: bus.publish(EventType.READINESS_CHANGED))
 
     return AppContext(paths, config, clock, bus, runtime, db, codec, scheduler, journeys, passengers,
-                      notifications, alerts, availability, brave, wallet, readiness, health, reminders)
+                      notifications, alerts, availability, brave, wallet, readiness, health, reminders, time_sync)
