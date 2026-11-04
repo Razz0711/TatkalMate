@@ -8,6 +8,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Create a GitHub Release with this tag (e.g. v0.1.0). Leave empty to only build."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -69,4 +74,15 @@ jobs:
         run: |
           gh release create $env:GITHUB_REF_NAME TatkalMate-windows-x64.zip `
             --title "TatkalMate AI $env:GITHUB_REF_NAME" `
+            --notes "Windows 11 x64 build. Unzip and run TatkalMate.exe. The exe is not code-signed, so SmartScreen will warn on first launch: click 'More info' then 'Run anyway'. Availability data is simulated until an authorized provider is configured (see README)."
+
+      - name: Publish GitHub Release from a manual run
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release create $env:TAG TatkalMate-windows-x64.zip --target $env:GITHUB_SHA `
+            --title "TatkalMate AI $env:TAG" `
             --notes "Windows 11 x64 build. Unzip and run TatkalMate.exe. The exe is not code-signed, so SmartScreen will warn on first launch: click 'More info' then 'Run anyway'. Availability data is simulated until an authorized provider is configured (see README)."
