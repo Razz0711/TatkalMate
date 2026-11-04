@@ -1,0 +1,18 @@
+[project]
+name = "tatkalmate"
+version = "0.1.0"
+description = "Desktop assistant for preparing and monitoring IRCTC Tatkal bookings (no automated booking)."
+requires-python = ">=3.11"
+dependencies = ["PySide6>=6.6,<7", "psutil>=5.9", "tzdata>=2024.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-qt>=4.4", "pyinstaller>=6.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+qt_api = "pyside6"
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
