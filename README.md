@@ -40,7 +40,7 @@ Grab `TatkalMate-windows-x64.zip` from the [latest release](https://github.com/R
 
 The exe is **not code-signed**, so Windows SmartScreen shows "Windows protected your PC" on first launch. Click **More info → Run anyway**. Every build is produced by the public GitHub Actions workflow in `.github/workflows/windows-release.yml`, which also runs the test suite on Windows.
 
-To publish a new version: bump `core/version.py`, then `git tag v0.1.1 && git push --tags`.
+To publish a new version: bump `core/version.py`, then either push a `v*` tag or create a release on GitHub (Releases → Draft a new release). The workflow builds the exe and attaches it.
 
 ## Run from source on Windows 11
 
