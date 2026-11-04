@@ -33,6 +33,7 @@ from services.passenger_service import PassengerService
 from services.readiness_service import ReadinessService
 from services.reminder_service import ReminderService
 from services.time_sync_service import TimeSyncService
+from services.update_service import UpdateService
 from services.wallet_readiness_service import WalletReadinessService
 
 log = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ class AppContext:
     health: HealthService
     reminders: ReminderService
     time_sync: TimeSyncService | None = None
+    updates: UpdateService | None = None
     background_started: bool = False
 
     def start_background(self) -> None:
@@ -165,4 +167,5 @@ def build_context(
         bus.subscribe(et, lambda _e: bus.publish(EventType.READINESS_CHANGED))
 
     return AppContext(paths, config, clock, bus, runtime, db, codec, scheduler, journeys, passengers,
-                      notifications, alerts, availability, brave, wallet, readiness, health, reminders, time_sync)
+                      notifications, alerts, availability, brave, wallet, readiness, health, reminders, time_sync,
+                      UpdateService(paths, scheduler, clock))

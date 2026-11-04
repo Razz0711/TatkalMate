@@ -11,7 +11,7 @@ from services.container import AppContext
 
 
 class SettingsView(Page):
-    def __init__(self, ctx: AppContext):
+    def __init__(self, ctx: AppContext, updater=None):
         super().__init__("Settings", "Saved on this computer. Secrets such as provider API keys go in a .env file, "
                                      "never here.")
         self.ctx = ctx
@@ -103,6 +103,31 @@ class SettingsView(Page):
                                  "contacts IRCTC."))
         self.content.addWidget(net)
 
+        from app.components.widgets import muted as _muted
+        from core.version import __version__
+        up = Card("Updates")
+        self.update_status = _muted("")
+        up.body.addWidget(_muted(f"Installed version: {__version__}"))
+        up.body.addWidget(self.update_status)
+        self.auto_check = QCheckBox("Check for updates on start-up and every 6 hours")
+        up.body.addWidget(self.auto_check)
+        urow = QHBoxLayout()
+        self.check_btn = button("Check for updates")
+        self.install_btn = button("Download and install", primary=True)
+        urow.addWidget(self.check_btn)
+        urow.addWidget(self.install_btn)
+        urow.addStretch(1)
+        up.body.addLayout(urow)
+        up.body.addWidget(_muted("Updates come from github.com/Razz0711/TatkalMate releases and are checked with SHA-256 "
+                                 "before install. They are paused from 30 min before to 15 min after Tatkal opens."))
+        self.content.addWidget(up)
+        self.updater = updater
+        if updater is not None:
+            self.check_btn.clicked.connect(lambda: updater.check())
+            self.install_btn.clicked.connect(lambda: updater.install(self))
+            updater.changed.connect(self._update_state)
+        self._update_state()
+
         row = QHBoxLayout()
         self.save_btn = button("Save settings", primary=True)
         self.reset_btn = button("Revert")
@@ -130,11 +155,24 @@ class SettingsView(Page):
         self.auto_launch.setValue(c.browser.auto_launch_minutes_before)
         self.focus_open.setChecked(c.browser.focus_at_opening)
         self.ntp_enabled.setChecked(c.time_sync.enabled)
+        self.auto_check.setChecked(c.ui.check_updates)
         self.ntp_servers.setText(", ".join(c.time_sync.servers))
         self.brave_path.setText(c.browser.brave_path_override)
         self.irctc_url.setText(c.browser.irctc_url)
         self.probe_host.setText(c.network.probe_host)
         self.probe_port.setValue(c.network.probe_port)
+
+    def _update_state(self) -> None:
+        u = self.updater
+        if u is None:
+            self.update_status.setText("Updater unavailable.")
+            self.check_btn.setEnabled(False)
+            self.install_btn.setEnabled(False)
+            return
+        self.update_status.setText(u.status)
+        self.check_btn.setEnabled(not u.busy)
+        self.install_btn.setEnabled(not u.busy and u.available is not None)
+        self.install_btn.setText(f"Download and install {u.available.version}" if u.available else "Download and install")
 
     def _browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Locate brave.exe", "", "Brave (brave.exe brave);;All files (*)")
@@ -165,6 +203,7 @@ class SettingsView(Page):
         c.browser.auto_launch_minutes_before = self.auto_launch.value()
         c.browser.focus_at_opening = self.focus_open.isChecked()
         c.time_sync.enabled = self.ntp_enabled.isChecked()
+        c.ui.check_updates = self.auto_check.isChecked()
         c.time_sync.servers = [x.strip() for x in self.ntp_servers.text().split(",") if x.strip()]
         c.browser.brave_path_override = self.brave_path.text().strip()
         c.browser.irctc_url = self.irctc_url.text().strip()

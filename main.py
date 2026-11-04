@@ -108,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     instance.activate_requested.connect(window.show_and_raise)
     ctx.start_background()
     window.show()
+    window.updater.start()
 
     if previous_unclean:
         ctx.notifications.notify(NotificationKind.SYSTEM, "Recovered from an unexpected exit",

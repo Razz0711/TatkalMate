@@ -81,6 +81,8 @@ class MainWindow(QMainWindow):
         sl.addWidget(ver)
         layout.addWidget(sidebar)
 
+        from app.update_controller import UpdateController
+        self.updater = UpdateController(ctx, bridge, self)
         self.stack = QStackedWidget()
         self.views = {
             "dashboard": DashboardView(ctx),
@@ -90,7 +92,7 @@ class MainWindow(QMainWindow):
             "monitoring": MonitoringView(ctx, bridge),
             "notifications": NotificationsView(ctx),
             "browser": BrowserView(ctx),
-            "settings": SettingsView(ctx),
+            "settings": SettingsView(ctx, self.updater),
             "diagnostics": DiagnosticsView(ctx, bridge),
         }
         for item in NAV_ITEMS:

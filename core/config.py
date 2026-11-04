@@ -75,6 +75,7 @@ class TimeSyncConfig:
 @dataclass
 class UiConfig:
     start_page: str = "dashboard"
+    check_updates: bool = True
     minimize_to_tray: bool = False
 
 

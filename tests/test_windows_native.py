@@ -43,3 +43,33 @@ def test_default_data_dir_is_localappdata(monkeypatch):
 
     monkeypatch.delenv("TATKALMATE_HOME", raising=False)
     assert "AppData" in str(default_root()) or "LOCALAPPDATA" in str(default_root())
+
+
+def test_update_helper_swaps_folder_and_keeps_data(tmp_path):
+    """Runs the real PowerShell helper against a fake install."""
+    import subprocess
+
+    from core.clock import SystemClock
+    from core.paths import AppPaths
+    from core.scheduler import TatkalScheduler
+    from services.update_service import UpdateService
+
+    app = tmp_path / "Apps" / "TatkalMate"
+    app.mkdir(parents=True)
+    (app / "TatkalMate.exe").write_text("old")
+    data = AppPaths(tmp_path / "LocalAppData" / "TatkalMate").ensure()
+    data.config_file.write_text('{"keep": true}')
+    new = tmp_path / "LocalAppData" / "TatkalMate" / "updates" / "9.0.0" / "extracted" / "TatkalMate"
+    new.mkdir(parents=True)
+    (new / "TatkalMate.exe").write_text("new")
+
+    svc = UpdateService(data, TatkalScheduler(SystemClock()), SystemClock(), app_dir=app, frozen=True)
+    dead = subprocess.Popen(["cmd", "/c", "exit 0"])
+    dead.wait()
+    cmd = [c for c in svc.helper_command(new, pid=dead.pid, no_start=True) if c not in ("-WindowStyle", "Hidden")]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    log = (data.root / "updates" / "update.log").read_text()
+    assert result.returncode == 0, log + result.stderr
+    assert (app / "TatkalMate.exe").read_text() == "new"
+    assert not (app.parent / "TatkalMate.old").exists()
+    assert data.config_file.read_text() == '{"keep": true}'

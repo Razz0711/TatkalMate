@@ -19,6 +19,7 @@ A Windows desktop assistant (PySide6) that **prepares** you for an IRCTC Tatkal 
 | Availability | Provider abstraction, rate-limited polling, backoff, timeouts, de-duplication, stale/cached detection, full history |
 | Notifications | Windows toasts, in-app centre, sounds, duplicate suppression (persists across restarts) |
 | Browser | Detects Brave, launches it with your normal profile on the IRCTC site, watches for unexpected closure, brings it to the front |
+| Updater | Checks GitHub Releases, one-click download + SHA-256 verify + install + restart; paused T-30 to T+15 |
 | Reliability | Single instance, crash reports, unclean-exit recovery, supervised background tasks, log rotation, health checks |
 
 ![Quick panel](docs/screenshots/10-quick-panel.png)
@@ -44,6 +45,8 @@ A Windows desktop assistant (PySide6) that **prepares** you for an IRCTC Tatkal 
 Grab `TatkalMate-windows-x64.zip` from the [latest release](https://github.com/Razz0711/TatkalMate/releases/latest), unzip it anywhere (e.g. `C:\Apps\TatkalMate`) and run `TatkalMate.exe`.
 
 The exe is **not code-signed**, so Windows SmartScreen shows "Windows protected your PC" on first launch. Click **More info → Run anyway**. Every build is produced by the public GitHub Actions workflow in `.github/workflows/windows-release.yml`, which also runs the test suite on Windows.
+
+**Updates:** the app checks GitHub Releases on start-up and every 6 hours. When a new version is out you get a notification; install it from **Settings → Updates** with one click. The zip is verified against the release's SHA-256 file, the app folder is swapped by a small PowerShell helper (with rollback), and TatkalMate restarts. Your data stays in `%LOCALAPPDATA%\TatkalMate` and is untouched. Updates are paused from 30 min before to 15 min after a Tatkal opening. Keep the app folder somewhere you own, such as `C:\Apps\TatkalMate`, and not in Program Files.
 
 To publish a new version: bump `core/version.py`, then either push a `v*` tag, create a release on GitHub, or run the **Windows build** workflow from the Actions tab with a `release_tag`. The workflow builds the exe and attaches it.
 
